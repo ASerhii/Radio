@@ -1,43 +1,37 @@
 const express = require('express');
-const http = require('http');
+const request = require('request');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Проксі маршрут
-app.get('/ibiza', (req, res) => {
-  const options = {
-    hostname: 'air.radiorecord.ru',
-    port: 805,
-    path: '/ibiza_320',
-    method: 'GET',
-    headers: {
-      'Icy-MetaData': '1',
-      'User-Agent': 'Mozilla/5.0'
-    }
-  };
+const stations = {
+  ibiza: 'http://air.radiorecord.ru:805/ibiza_320',
+  goa: 'http://air.radiorecord.ru:805/goa_320',
+  trance: 'http://air.radiorecord.ru:805/trance_320'
+};
 
-  const streamReq = http.request(options, streamRes => {
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  next();
+});
+
+app.get('/:station', (req, res) => {
+  const url = stations[req.params.station];
+  if (!url) return res.status(404).send('Станція не знайдена 😢');
+
+  // Встановлюємо Content-Type в залежності від розширення
+  if (url.endsWith('_320')) {
     res.setHeader('Content-Type', 'audio/mpeg');
-    streamRes.pipe(res);
-  });
+  } else {
+    res.setHeader('Content-Type', 'audio/aac');
+  }
 
-  streamReq.on('error', err => {
+  req.pipe(request(url)).pipe(res).on('error', (err) => {
     console.error('Stream error:', err);
-    res.sendStatus(500);
+    res.end();
   });
-
-  streamReq.end();
 });
 
-// Головна сторінка з плеєром
-app.get('/', (req, res) => {
-  res.send(`
-    <h1>Радіо IBIZA 🎶</h1>
-    <audio controls autoplay src="/ibiza"></audio>
-  `);
-});
-
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🔥 Ibiza proxy server running on port ${PORT}`);
+  console.log(`Радіо-проксі на порту ${PORT}`);
 });
